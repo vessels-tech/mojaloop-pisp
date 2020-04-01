@@ -1,0 +1,154 @@
+
+@startuml Endpoints_Linking
+autonumber
+title Endpoints_Linking
+
+participant "PISP Server" as PISP
+box "Mojaloop"
+  participant "Switch" as Switch
+  participant "FIDO" as FIDO
+  participant "ALS" as ALS
+end box
+participant "DFSP" as DFSP
+
+'TODO: could this not be handled by the ALS?
+
+group
+  group __Step 1:__ Obtain the Login URI
+    note over PISP, Switch
+      __Note:__ This assumes that DFSPA in fact
+      holds one or more accounts for the given user.
+      Should we also enforce a parties lookup before this
+      step, to make sure the user holds an account that can 
+      be linked? Or should we be agnostic about this, and 
+      assume the end user 'knows' which DFSP(s) they hold 
+      accounts with, and will select the correct one?
+    end note
+    PISP -> Switch: ""GET /loginUri/DFSPA""
+    ' Switch --> PISP: ""202 Accepted""
+    Switch -> Switch: Store this request so we know who to \ncallback to
+    
+    alt No ALS
+    Switch -> Switch: Lookup endpoints for DFSPA
+    Switch -> DFSP: ""GET /loginUri""
+    ' DFSP --> Switch: ""202 Accepted""
+
+    DFSP -> Switch: ""PUT /loginUri""
+    ' Switch --> DFSP: ""202 Accepted""
+    ' TODO: Error case: ""PUT /loginUri/error/DFSPA""
+
+    else With ALS
+    Switch -> ALS: ""GET /LOGIN_URI/DFSPA""
+    ALS --> Switch: Here's the DFSP login uri information
+
+    end group
+  Switch -> PISP: ""PUT /loginUri/DFSPA""
+end group
+
+group __Step 2:__ Get the token (outside scope of the API doc)
+  note over PISP
+    a. PISP App opens DFSP App with deep link, or opens browser
+    b. End user performs login directly with DFSP
+  end note
+
+  DFSP -> DFSP: User performs login from browser session
+  DFSP -> PISP: Returns temporary "linking token" directly to PISP via browser redirects
+end group
+
+group __Step 3:__ Get account metadata for linking
+  ' TODO: figure out where the token should go
+  PISP -> Switch: ""GET /parties/{}""\n""X-Token:12345""
+  ' Switch --> PISP: ""202 Accepted""
+  ...Existing GET /parties request...
+  DFSP -> Switch: ""POST /parties/{}""\n""accountList:[...]""
+  ' TODO: handle failure case
+  Switch -> PISP: ""POST /parties/{}""\n""accountList:[...]""
+
+end group
+
+group __Step 4:__ FIDO Registration
+  ' TODO: this is a get, so we can't add data... but for arguments sake we need
+  ' To pass this on
+  PISP -> Switch: ""GET /auth/challenge""\n""{token: 1234, dfsp: dfsp1, account: accountA}""
+  
+  ' TODO: is the switch able to verify the token is valid? Or does it need to call out to the 
+  ' DFSP?
+  Switch -> Switch: Verify "linking token" is valid
+
+  Switch -> FIDO: ""GET /auth/challenge""\n""{token: 1234,""\n  ""dfsp: dfsp1,"" \n  ""account: accountA}""
+
+  FIDO -> FIDO: Generate a random \nchallenge and save locally
+  FIDO -> Switch: ""POST /auth/challenge""\n""{challenge: 987654321}""
+
+  Switch -> PISP: ""POST /auth/challenge""\n""{challenge: 987654321}""
+  ' TODO: handle failure case here
+
+  note over PISP
+    (outside scope)
+    a. PISP Server passes challenge to app. App signs the challenge
+  end note
+
+  PISP -> Switch: ""POST /auth/challengeResult""\n{ signedChallenge:asduh1248,\n  publicKey:AAAABBBB }
+  Switch -> FIDO: ""POST /auth/challengeResult""\n{ signedChallenge:asduh1248,\n  publicKey:AAAABBBB }
+  FIDO -> FIDO: Verify the signedChallenge matches\nthe original challenge,and has\nbeen signed by the correct \nprivate key
+  ' TODO: handle failure case
+
+  FIDO -> Switch: ""PUT /auth/challengeResult/success""
+  Switch -> PISP: ""PUT /auth/challengeResult/success""
+  
+end group
+
+group __Step 5:__ Account Association
+
+  note over PISP
+  TODO:
+  a. inform the DFSP an account has been registered
+  b. DFSP update the ALS with the association
+  c. Get callback from DFSP to PISP that says: "Ok, associate that with this random uuid"
+
+  end note
+
+  Switch -> DFSP: ""POST /auth/registration""\nInform the DFSP a PISP now has delegates access to an account
+  DFSP -> DFSP: Generate a random UUID to \nassociate with the (Party + Account)
+  DFSP -> Switch: ""POST /participants/ASSOCIATION/<random uuid>"" (existing call)
+  Switch -> ALS: ""POST /participants/ASSOCIATION/<random uuid>"" (existing call)
+  Switch -> DFSP: ""PUT /participants/ASSOCIATION/<random uuid>"" 
+  DFSP -> Switch: ""PUT /auth/association/<random uuid>""
+  Switch -> PISP: ""PUT /auth/association/<random uuid>""
+
+end group
+
+
+
+
+
+
+
+
+
+' TODO: failure case here?
+
+' Ayeesha -> App : I want to register my \nchequing account from DFSP A\n with your wonderful app
+
+' ...Account Linking steps \nRefer to `PISP Linking` for detail...
+
+' note over Ayeesha, PISP
+'   __Note:__ All messages between
+'   the PISP Server and DFSP are passed
+'   via the switch, but this is
+'   removed for simplicity
+' end note
+
+' DFSP -> DFSP: Generate random UUID \n& save internally
+' DFSP -> PISP: Here's a Random UUID: ""1111-2222""\nLet's use this to refer to the account Ayeesha just linked
+' PISP --> DFSP: Sure
+' PISP -> PISP: Internally associate Ayeesha's \nchequing account with ""1111-2222""
+' DFSP -> Switch: ""POST /participants/ASSOCIATION/1111-2222""
+' Switch --> DFSP: ""201 Accepted""
+' Switch -> ALS: Create a new key/value pair: \n""{'ASSOCIATION/1111-2222': 'DFSPA'}""
+' ALS --> Switch: OK
+' Switch -> DFSP: ""PUT /participants/ASSOCIATION/1111-2222""\nThe Association has been created
+' DFSP -> PISP: The association has been created
+
+
+@enduml
