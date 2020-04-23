@@ -1,0 +1,208 @@
+@startuml
+
+title PISP Transfer: Discovery
+
+!include participants.iuml
+
+autonumber 1 "<b>DISC-#</b>"
+group Discovery: Who are we sending funds from and to?
+CA->App:I would like to transfer\n$100 to B@Somewhere
+activate App
+App->D1:Ayesha would like to transfer\n$100 to B@Somewhere
+activate D1
+D1-->App:Got it.
+deactivate App
+D1->D1:What is Ayesha's payer key?\nIt's A@Elsewhere
+D1->S:Which DFSP owns A@Elsewhere?\n(**"""GET /parties"""**)
+activate S 
+S-->D1:202: I'll get back to you
+deactivate D1
+S->A:Which DFSP owns A@Elsewhere?
+activate A 
+A-->S:It's DFSP A
+deactivate A
+S->D1:DFSP A speaks for A@Elsewhere
+activate D1
+D1-->S:200 OK, got it
+deactivate S 
+note over D1
+
+The PISP server doesn't need to know
+where to send the payment: this will
+be handled as part of the transfer from
+DFSP A
+
+end note 
+
+D1->S:Which DFSP owns B@Somewhere?\n(**GET /parties**)
+activate S 
+S-->D1:202 I'll get back to you
+deactivate D1
+S->A:Which DFSP owns B@Somewhere?
+activate A 
+A-->S:It's DFSP B
+deactivate A
+S->D3:Do you speak for B@Somewhere?
+activate D3
+D3-->S:202 I'll get back to you
+deactivate S
+D3->D3:Retrieve customer information for Bhavesh
+D3->S:Here's Bhavesh's personal information
+activate S 
+S-->D3:200 OK, got it
+deactivate D3
+
+S->D1:DFSP A speaks for B@Somewhere\nThe customer is Bhavesh
+activate D1
+D1-->S:200 OK, got it
+deactivate S
+D1->App:System reports\ncustomer name is Bhavesh
+activate App
+App->CA:That's Bhavesh, right?
+CA-->App:Yes, it is
+App->D1:Customer is happy that she's\nsending to the right recipient
+deactivate App
+
+
+
+end group
+
+
+' == Discovery ==
+
+' CA->App:I would like to transfer\n$100 to B@Somewhere
+' activate App
+' App->D1:Ayesha would like to transfer\n$100 to B@Somewhere
+' activate D1
+' D1-->App:Got it.
+' deactivate App
+' D1->D1:What is Ayesha's payer key?\nIt's A@Elsewhere
+' D1->S:Which DFSP owns A@Elsewhere?\n(**GET /parties**)
+' activate S 
+' S-->D1:202: I'll get back to you
+' deactivate D1
+' S->A:Which DFSP owns A@Elsewhere?
+' activate A 
+' A-->S:It's DFSP A
+' deactivate A
+' S->D1:DFSP A speaks for A@Elsewhere
+' activate D1
+' D1-->S:200 OK, got it
+' deactivate S 
+' note over D1
+
+' The PISP server doesn't need to know
+' where to send the payment: this will
+' be handled as part of the transfer from
+' DFSP A
+
+' end note 
+
+' D1->S:Which DFSP owns B@Somewhere?\n(**GET /parties**)
+' activate S 
+' S-->D1:202 I'll get back to you
+' deactivate D1
+' S->A:Which DFSP owns B@Somewhere?
+' activate A 
+' A-->S:It's DFSP B
+' deactivate A
+' S->D3:Do you speak for B@Somewhere?
+' activate D3
+' D3-->S:202 I'll get back to you
+' deactivate S
+' D3->D3:Retrieve customer information for Bhavesh
+' D3->S:Here's Bhavesh's personal information
+' activate S 
+' S-->D3:200 OK, got it
+' deactivate D3
+
+' S->D1:DFSP A speaks for B@Somewhere\nThe customer is Bhavesh
+' activate D1
+' D1-->S:200 OK, got it
+' deactivate S
+' D1->App:System reports\ncustomer name is Bhavesh
+' activate App
+' App->CA:That's Bhavesh, right?
+' CA-->App:Yes, it is
+' App->D1:Customer is happy that she's\nsending to the right recipient
+' deactivate App
+
+
+
+
+
+
+' note over D1
+
+' So now I know both the actual parties:
+' DFSP A is the payer DFSP
+' DFSP B is the payee DFSP
+
+' Now I need to request DFSP A to make the payment
+
+
+' end note
+
+' D1->S:Please ask DFSP A to transfer\n$100 from Ayesha to Bhavesh
+' activate S 
+' S-->D1:202 I'll get back to you 
+' deactivate D1
+
+' note over S
+
+' The switch receives a message that looks like the one below.
+' It's a standard Mojaloop message
+
+' POST /transactionRequests HTTP/1.1
+' //todo: should this source be PISP???
+' FSPIOP-Source: PISP
+' FSPIOP-Destination: DFSP A 
+
+' {
+'     "transactionRequestId": "8d34f91d-d078-4077-8263-2c047876fcf6",
+'     "payee": {
+'         "partyIdInfo": {
+'             "partyIdType": "ALIAS",
+'             "partyIdentifier": "B@Somewhere", 
+'             "fspId": "DFSP B"
+'         }
+'     },
+'     "payer": {
+'         "personalInfo": {
+'             "complexName": {
+'                 "firstName": "Ayesha",
+'                 "lastName": "Takia"
+'             }
+'         },
+'         "partyIdInfo": {
+'             "partyIdType": "ALIAS",
+'             "partyIdentifier": "A@Elsewhere",
+'             "fspId": "DFSP A"
+'         }
+'     },
+'     "amountType": "RECEIVE",
+'     "amount": {
+'         "amount": "100",
+'         "currency": "USD"
+'     },
+'     "transactionType": {
+'         "scenario": "TRANSFER",
+'         "initiator": "PAYER",
+'         "initiatorType": "CONSUMER"
+'     },
+'     "note": "Ayesha via PISP",
+'     "expiration": "2020-02-15T22:17:28.985-01:00"
+'     ]
+' }
+
+' end note 
+' S->S:Store this request
+' S->D2:Please ask DFSP A to transfer\n$100 from Ayesha to Bhavesh
+' activate D2
+' D2-->S:202 I'll get back to you
+' deactivate S
+' D2->D2:Store this request
+
+
+
+@enduml

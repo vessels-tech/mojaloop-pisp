@@ -1,0 +1,13 @@
+box "Mobile device"
+    actor Ayesha as CA
+    participant "PISP App" as App
+end box
+participant "PISP Server\n(DFSP)" as D1
+box "Mojaloop"
+    participant ALS as A
+    participant Switch as S
+    participant "Central\nFIDO Server" as FIDO
+end box
+participant "Payer DFSP\n(DFSP A)" as D2
+participant "Payee DFSP\n(DFSP B)" as D3
+actor "Bhavesh\n(B@Somewhere)" as CB

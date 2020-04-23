@@ -1,0 +1,97 @@
+@startuml
+
+title PISP Transfer: Balance Check
+
+!include participants.iuml
+
+autonumber 1 "<b>BAL-#</b>"
+note over D1
+
+This balance check can be repeated for each account linked
+to Ayesha's PISP App.
+
+The token referred to here was exchanged in the linking step.
+Outside of scope here is any concept of Refresh tokens and 
+background processes the PISP Server must do to keep tokens alive
+
+end note 
+group Balance Check: What funds are in my account(s)?
+CA->App:How much do I have in my account(s)?
+activate App
+App->D1:Ayesha would like to know her account balances
+activate D1
+' D1-->App:Got it.
+' deactivate App
+D1->D1:What is Ayesha's DFSP?\nIt's DFSPA
+D1->D1:What is Ayesha's DFSP Token?\nIt's 1111-2222
+D1->S:**"""GET /parties"""**\nx-account-token=1111-2222\nFSPIOP-Source=PISP\nFSPIOP-Destination=DFSPA
+activate S 
+S-->D1:202: I'll get back to you
+deactivate D1
+S->D2:What is the account metadata for Ayesha?\nI have this special token you might know about: """1111-2222"""
+activate D2
+D2-->S:202: I'll get back to you
+deactivate S
+D2->D2:Validate Token\nLookup Balance
+D2->S:Ayeesha's balance is $100
+activate S
+S-->D2:200: OK, got it
+deactivate D2
+S->D1:Ayeesha's balance is $100
+activate D1
+D1-->S:200: OK, got it
+deactivate S
+D1->App:Ayeesha's balance is $100
+deactivate D1
+S->CA:You have $100.\nDon't spend it all at the same time!
+deactivate S
+
+
+
+' A-->S:It's DFSP A
+' deactivate A
+' S->D1:DFSP A speaks for A@Elsewhere
+' activate D1
+' D1-->S:200 OK, got it
+' deactivate S 
+' note over D1
+
+' The PISP server doesn't need to know
+' where to send the payment: this will
+' be handled as part of the transfer from
+' DFSP A
+
+' end note 
+
+' D1->S:Which DFSP owns B@Somewhere?\n(**GET /parties**)
+' activate S 
+' S-->D1:202 I'll get back to you
+' deactivate D1
+' S->A:Which DFSP owns B@Somewhere?
+' activate A 
+' A-->S:It's DFSP B
+' deactivate A
+' S->D3:Do you speak for B@Somewhere?
+' activate D3
+' D3-->S:202 I'll get back to you
+' deactivate S
+' D3->D3:Retrieve customer information for Bhavesh
+' D3->S:Here's Bhavesh's personal information
+' activate S 
+' S-->D3:200 OK, got it
+' deactivate D3
+
+' S->D1:DFSP A speaks for B@Somewhere\nThe customer is Bhavesh
+' activate D1
+' D1-->S:200 OK, got it
+' deactivate S
+' D1->App:System reports\ncustomer name is Bhavesh
+' activate App
+' App->CA:That's Bhavesh, right?
+' CA-->App:Yes, it is
+' App->D1:Customer is happy that she's\nsending to the right recipient
+deactivate App
+
+end group
+
+@enduml
